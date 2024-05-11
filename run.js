@@ -3,33 +3,24 @@ const fs = require("fs");
 const AWS = require("aws-sdk");
 require("aws-sdk/lib/maintenance_mode_message").suppress = true;
 const puppeteer = require("puppeteer-extra");
-const useProxy = require("@stableproxy/puppeteer-page-proxy");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-
 puppeteer.use(StealthPlugin());
 
 const IDRIVE_ENPOINT = "d4b6.or4.idrivee2-60.com";
 const IDRIVE_ACCESS_KEY_ID = "5ce3lLJdmdBVLqcX7RPD";
 const IDRIVE_SECRET_ACCESS_KEY = "a6USwSGtrxBDlV2n19XUJWcMt69ivtpu5zm63Hfi";
-const BUCKET_NAME = "alchemy-dwi-cookies";
+const BUCKET_NAME = "alchemy-cookies";
 
 const CONCURENCY = 2;
-const HEADLESS = false; // HEADLESS  false or false;
-
-const USE_PROXY = false;
-const PROTOCOL = "http";
-const PROXY_HOST = "gate.smartproxy.com";
-const PROXY_PORT = "7000";
-const PROXY_USERNAME = "spoj3coqzt";
-const PROXY_PASSWORD = "ttZaB35y17tG~Ocsdw";
+const HEADLESS = "new"; // HEADLESS  false or "new";
 
 const dataAccount = `
+badrusfuadi01@gmail.com,zCxobyEBbJFlwaG,0x2cc0A1D3812B0C79C4d6658670079b898C1eFEf4
+hermanpentol4@gmail.com,zCxobyEBbJFlwaG,0x884770A0f70291aD4496B8f538c8DD3c09dC593a
+Aboryakie@gmail.com,zCxobyEBbJFlwaG,0xC36B7F40Aa5BdBAA5f1f3246BB9d2A647f66cdFf
+aguekaloj@gmail.com,zCxobyEBbJFlwaG,0x4a57E4a028120344fDCc4427CbbF211D518ED4eb
+asokyata@gmail.com,zCxobyEBbJFlwaG,0xf9c1e9C73423eA30675670e66bCd5a443e38D5b5
 
-chiefg@fadsfg1d.shop,@@Masuk123#oZ,0x1095d22490c34b5aae0e452317c0bbc7b62ab926
-saleblock411@fadsfg1d.shop,@@Masuk123#oZ,0x20ee1d3641f66710800aea0525bc20f7ce12cbd6
-jtmmjfc@fadsfg1d.shop,@@Masuk123#oZ,0x930849038b52bc56d405e41d78b6d53f9e86ff3e
-brickerson@fadsfg1d.shop,@@Masuk123#oZ,0xe13d4bf74b5030f234d75a6d5ed0529e647fd23d
-qwertywq@fadsfg1d.shop,@@Masuk123#oZ,0x939096a2554a78659a6992fcfa4ab72acabf11ba
 `;
 
 const waiting = (time) => {
@@ -169,7 +160,7 @@ const retryElement = async (page, element, xpath = false, retryCount = 1) => {
   }
 };
 
-const launchBrowser = async () => {
+const getBrowser = async () => {
   try {
     let browser;
 
@@ -191,12 +182,7 @@ const launchBrowser = async () => {
       "--flag-switches-begin --disable-site-isolation-trials --flag-switches-end",
     ];
 
-    const proxyHost = `${PROTOCOL}://${PROXY_HOST}:${PROXY_PORT}`;
-
-    USE_PROXY ? args.push(`--proxy-server=${proxyHost}`) : null;
-
     let browserOptions = {
-      executablePath: process.env.PUPPETEER_EXEC_PATH,
       headless: HEADLESS,
       ignoreHTTPSErrors: true,
       acceptInsecureCerts: true,
@@ -217,13 +203,6 @@ const launchBrowser = async () => {
     ]);
 
     const [page] = await browser.pages();
-
-    if (USE_PROXY) {
-      await page.authenticate({
-        username: PROXY_USERNAME,
-        password: PROXY_PASSWORD,
-      });
-    }
 
     await page.setRequestInterception(true);
     const rejectRequestPattern = [
@@ -337,10 +316,10 @@ const claimFoucet = async (page, email, wallet) => {
   let message = "";
 
   try {
-    while (!success && retry <= maxTry) {
+    while (!success && retry < maxTry) {
       await waiting(2000);
 
-      await retryElement(page, 'form input[type="text"]');
+      await page.waitForSelector('form input[type="text"]');
       const walletInputElm = await page.$('form input[type="text"]');
 
       await page.evaluate((walletInput) => {
@@ -359,8 +338,6 @@ const claimFoucet = async (page, email, wallet) => {
       const [sendButtonElm] = await page.$x(
         '//div/button[contains(., "Send Me ETH")]'
       );
-
-      await waiting(2000);
 
       await sendButtonElm.click();
 
@@ -387,6 +364,9 @@ const claimFoucet = async (page, email, wallet) => {
         retry++;
 
         await waiting(3000);
+
+        const currentUrl = await page.url();
+        await page.goto(currentUrl, { waitUntil: "networkidle2" });
       }
     }
 
@@ -424,28 +404,22 @@ const bot = async (page, account) => {
   }
 };
 (async () => {
-  const args = process.argv;
+  const arguments = process.argv;
 
-  // const startData = parseInt(args[2]);
-  // const endData = parseInt(args[3]);
+  const startData = parseInt(arguments[2]);
+  const endData = parseInt(arguments[3]);
 
-  // if (!startData && !endData) {
-  //   console.log(`Params require "node run.js 0 5"`);
-  //   process.exit();
-  // }
-
-  // For github action
-  const rangeDate = process.env.RANGE_INDEX;
-  const splitDate = rangeDate.split(",");
-  const startData = splitDate[0];
-  const endData = splitDate[1];
+  if (!startData && !endData) {
+    console.log(`Arguments require "node run.js 0 5"`);
+    process.exit();
+  }
 
   const accounts = getData(dataAccount, startData, endData);
 
   return bluebird.map(
     accounts,
     async (account) => {
-      const { page, browser } = await launchBrowser();
+      const { page, browser } = await getBrowser();
 
       try {
         await bot(page, account);
